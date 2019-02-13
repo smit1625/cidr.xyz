@@ -3,34 +3,30 @@ import './style.scss';
 import { Netmask } from 'netmask';
 import React, { Component } from 'react';
 import ReactDOM from 'react-dom';
+import { List, Map } from 'immutable';
 
 class IPAddress extends Component {
   constructor(props) {
     super(props);
-    this.state = {
-      octets: [10, 88, 135, 144],
-      cidr: 28
-    };
     this.handleChange = this.handleChange.bind(this);
     this.handleKeyDown = this.handleKeyDown.bind(this);
   }
 
   handleChange(event) {
-    var octets = this.state.octets;
+    // var octets = this.props.block.get('octets');
     var val = +event.target.value.replace(/[^0-9]/g, '');
     var octet = event.target.attributes['data-octet'].value;
     if (octet == 'cidr') {
       if (val <= 32) {
-        this.setState({
-          cidr: val
-        });
+        this.props.updateBlock(this.props.block.set('cidr', val));
       }
     } else {
       if (val <= 255) {
-        octets[+octet] = val;
-        this.setState({
-          octets: octets
-        });
+        this.props.updateBlock(this.props.block.update('octets', octets => octets.set(+octet, val)));
+        // octets[+octet] = val;
+        // this.setState({
+        //   octets: octets
+        // });
       }
     }
   }
@@ -49,7 +45,7 @@ class IPAddress extends Component {
   }
 
   getPretty() {
-    return this.state.octets.join('.') + '/' + this.state.cidr;
+    return this.props.block.get('octets').join('.') + '/' + this.props.block.get('cidr');
   }
 
   render() {
@@ -66,7 +62,7 @@ class IPAddress extends Component {
                 data-octet={octet}
                 onChange={this.handleChange}
                 onKeyDown={this.handleKeyDown}
-                value={this.state.octets[octet]}
+                value={this.props.block.getIn(['octets', octet])}
               />
               <span className="dot">{octet == '3' ? '/' : '.'}</span>
             </span>
@@ -77,7 +73,7 @@ class IPAddress extends Component {
             data-octet="cidr"
             onChange={this.handleChange}
             onKeyDown={this.handleKeyDown}
-            value={this.state.cidr}
+            value={this.props.block.get('cidr')}
           />
         </div>
 
@@ -89,12 +85,12 @@ class IPAddress extends Component {
                   {[...Array(8)].map((x, bit) => (
                     <li
                       className={
-                        octet * 8 + bit > this.state.cidr - 1
+                        octet * 8 + bit > this.props.block.get('cidr') - 1
                           ? 'bit masked'
                           : 'bit unmasked'
                       }
                     >
-                      {(this.state.octets[octet] & (1 << (7 - bit))) >>
+                      {(this.props.block.getIn(['octets', octet]) & (1 << (7 - bit))) >>
                         (7 - bit)}
                     </li>
                   ))}
@@ -127,4 +123,45 @@ class IPAddress extends Component {
   }
 }
 
-ReactDOM.render(<IPAddress />, document.getElementById('app'));
+const initialBlock = Map({
+  octets: List([10, 88, 135, 144]),
+  cidr: 28
+});
+
+class IpAddresses extends Component {
+  constructor(props) {
+    super(props);
+
+    this.state = {
+      blocks: List([initialBlock]),
+    };
+  }
+
+  handleAdd(e) {
+    e.preventDefault();
+
+    this.setState({ blocks: this.state.blocks.push(initialBlock) });
+  }
+
+  render() {
+    return (
+      <div>
+        {this.state.blocks.map((block, i) =>
+          <IPAddress
+            key={i}
+            block={block}
+            updateBlock={newBlock => {
+              this.setState({ blocks: this.state.blocks.set(i, newBlock) });
+            }}
+          />
+        )}
+
+        <p style={{ textAlign: 'center' }}>
+          <button onClick={this.handleAdd.bind(this)}>+ Add Block</button>
+        </p>
+      </div>
+    );
+  }
+}
+
+ReactDOM.render(<IpAddresses />, document.getElementById('app'));
